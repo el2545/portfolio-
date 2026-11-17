@@ -10,6 +10,17 @@
 
 **These results were reported by an earlier agent, not reproduced by this follow-up.**
 
+## Verified GitHub Actions execution (2026-11-17)
+
+- Workflow: `Hebrew RTL quality checks`, run [#44201371058](https://github.com/el2545/portfolio-/actions/runs/44201371058).
+- Commit tested: `69bb4435feb9916d193cd7e328d7cdc9e4d5080c`.
+- `npm ci --ignore-scripts`: passed.
+- `npm test`: **14 passed, 0 failed**, including all six positive/negative validator scenarios.
+- `npm run validate`: **passed**.
+- Test run used Ubuntu/Node 22 and GitHub Actions checkout. It did **not** run browsers, Lighthouse, axe-core, or screen readers.
+
+These results are directly observable in the CI logs. Future code commits must be tested again.
+
 ## Current follow-up changes
 
 - Unique canonical-link validation replaces a substring check.
@@ -24,7 +35,7 @@ npm test
 npm run validate
 ```
 
-The new validator regression cases must pass and the existing integrity checks must remain intact.
+CI has now run the validator regression cases successfully. Any subsequent changes must pass the same checks again.
 
 ## Additional manual/browser checks
 
@@ -36,4 +47,4 @@ The new validator regression cases must pass and the existing integrity checks m
 
 ## Acceptance status
 
-**Not signed off for merge or deployment.** Await new tests and independent visual/functional review.
+**Automated checks passed on the cited commit. Not signed off for merge or deployment:** independent visual/functional review and native-Hebrew/assistive-technology checks remain outstanding.
