@@ -2,7 +2,7 @@
 
 Multilingual academic and professional portfolio focused on **economics, finance, data analysis, investment appraisal and applied mobility analysis**.
 
-**Live site:** https://el2545.github.io/portfolio_UAE/
+
 
 ## Languages
 
