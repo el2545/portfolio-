@@ -1752,3 +1752,74 @@ html[lang="he"] #pdfTotal {
 }
 
 html[lang="he"] .di-hero h1 { text-align: right; }
+
+
+/* Hebrew-first refinement recovered from the 2026-11-17 Copilot work log.
+   Directional data rules target values, never entire mixed-language cards. */
+html[lang="he"] body {
+  line-height: 1.78;
+  text-rendering: optimizeLegibility;
+}
+html[lang="he"] h1,
+html[lang="he"] h2,
+html[lang="he"] h3 {
+  text-wrap: balance;
+}
+html[lang="he"] select {
+  line-height: 1.45;
+  text-align: start;
+}
+html[lang="he"] .di-hero__intro,
+html[lang="he"] .di-section-head > p,
+html[lang="he"] .di-study__body,
+html[lang="he"] .di-role__detail,
+html[lang="he"] .di-degree-note {
+  max-width: 68ch;
+}
+html[lang="he"] .di-study__scope dd,
+html[lang="he"] .di-carbon-result__number,
+html[lang="he"] .di-ad-results dd,
+html[lang="he"] .di-panel-results dd {
+  font-variant-numeric: tabular-nums;
+}
+/* Addresses and contact identifiers retain their LTR order inside RTL prose. */
+html[lang="he"] .di-contact__links a[href^="mailto:"] strong,
+html[lang="he"] .di-phone bdi,
+html[lang="he"] input[type="email"],
+html[lang="he"] input[type="tel"] {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+html[lang="he"] .di-project-nav {
+  border-block: 1px solid var(--di-line);
+  padding-block: 10px;
+}
+html[lang="he"] .di-project-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+html[lang="he"] .di-button,
+html[lang="he"] .di-hero-contact,
+html[lang="he"] .di-utility-button {
+  min-height: 48px;
+}
+html[lang="he"] .di-section--dark :focus-visible,
+html[lang="he"] .di-hero :focus-visible {
+  outline-color: #ffd1bd;
+}
+@media (max-width: 760px) {
+  html[lang="he"] .di-nav__links {
+    text-align: start;
+  }
+  html[lang="he"] .di-nav__links a {
+    min-height: 48px;
+    padding-block: 6px;
+  }
+  html[lang="he"] .di-hero h1 {
+    font-size: clamp(38px, 11vw, 58px);
+  }
+  html[lang="he"] .di-hero__intro {
+    line-height: 1.85;
+  }
+}
