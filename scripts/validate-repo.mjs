@@ -38,9 +38,22 @@ for (const file of pages.filter(file => file !== '404.html')) {
   if (!dirMatch || dirMatch[1].toLowerCase() !== expectedDir) {
     fail(`${file}: <html dir> must be "${expectedDir}"`);
   }
+  // Verify a real, unique <link rel="canonical"> element, not merely a
+  // canonical-looking URL appearing elsewhere in the document.
+  const readAttribute = (tag, attribute) => {
+    const found = tag.match(new RegExp(
+      `(?:\\s)${attribute}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, 'i'
+    ));
+    return found ? (found[1] ?? found[2]) : null;
+  };
+  const canonicalTags = [...html.matchAll(/<link\\b[^>]*>/gi)]
+    .map(match => match[0])
+    .filter(tag => (readAttribute(tag, 'rel') || '').toLowerCase()
+      .split(/\\s+/).includes('canonical'));
   const canonical = canonicalBase + (file === 'index.html' ? '' : file);
-  if (!html.includes(`href="${canonical}"`)) {
-    fail(`${file}: missing canonical URL ${canonical}`);
+  if (canonicalTags.length !== 1 ||
+      readAttribute(canonicalTags[0], 'href') !== canonical) {
+    fail(`${file}: expected exactly one <link rel="canonical" href="${canonical}">`);
   }
 }
 
