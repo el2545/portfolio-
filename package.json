@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "validate": "node scripts/validate-repo.mjs",
-    "test": "node --test advertising-model.test.mjs panel-workshop.test.mjs replay-cache.test.mjs portfolio-integrity.test.mjs"
+    "test": "node --test advertising-model.test.mjs panel-workshop.test.mjs replay-cache.test.mjs portfolio-integrity.test.mjs scripts/validate-repo.test.mjs"
   },
   "devDependencies": {
     "leaflet": "^1.9.4",
