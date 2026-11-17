@@ -46,10 +46,10 @@ for (const file of pages.filter(file => file !== '404.html')) {
     ));
     return found ? (found[1] ?? found[2]) : null;
   };
-  const canonicalTags = [...html.matchAll(/<link\\b[^>]*>/gi)]
+  const canonicalTags = [...html.matchAll(/<link\b[^>]*>/gi)]
     .map(match => match[0])
     .filter(tag => (readAttribute(tag, 'rel') || '').toLowerCase()
-      .split(/\\s+/).includes('canonical'));
+      .split(/\s+/).includes('canonical'));
   const canonical = canonicalBase + (file === 'index.html' ? '' : file);
   if (canonicalTags.length !== 1 ||
       readAttribute(canonicalTags[0], 'href') !== canonical) {
