@@ -102,6 +102,8 @@ The repository contains substantial simulation datasets. They are kept because t
 ## Documentation
 
 - `docs/HEBREW_UX_AUDIT_2026-11-17.md` — Hebrew / RTL UX audit.
+- `docs/HEBREW_DESIGN_SYSTEM.md` — Hebrew RTL typography, direction, and component rules.
+- `docs/hebrew-ux/VALIDATION.md` — responsive browser evidence and validation limitations.
 - `docs/TECHNICAL_HISTORY.md` — detailed historical implementation notes.
 - `docs/DATA_REVIEW.md` — data-source review notes.
 - `docs/REVIEW.md` — earlier review notes.

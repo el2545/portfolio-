@@ -4,9 +4,10 @@ Validation date: 2026-11-17
 
 ## Repository checks
 
-- `npm test`: 8 tests passed, 0 failed.
+- `npm test`: 11 tests passed, 0 failed.
 - `npm run validate`: passed.
 - The validator verifies the required Pages entry files, `<html lang>/<html dir>` combinations, canonical URLs, local assets, public preserved-asset hashes, and GitHub's 100 MiB file ceiling.
+- Negative validator tests cover invalid RTL direction, missing local assets, and incorrect canonical URLs.
 
 ## Browser checks
 
@@ -22,6 +23,8 @@ The Hebrew page was tested with a local HTTP server in Chromium at:
 At every width, `document.documentElement.scrollWidth` matched the viewport width and no horizontal overflow was detected. The page remained `lang="he" dir="rtl"`.
 
 The mobile navigation was opened at 375px. It reported `aria-expanded="true"`, opened as a grid menu, and introduced no horizontal overflow.
+
+The mobile menu button also exposed a 3px visible focus outline with a 4px offset. No clipping, collapsed controls, or reversed mixed-language runs were visible in the six saved screenshots.
 
 Screenshots:
 

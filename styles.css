@@ -52,6 +52,14 @@ input,
 select {
   font: inherit;
 }
+input[type="email"],
+input[type="number"],
+input[type="tel"],
+input[type="url"] {
+  direction: ltr;
+  text-align: start;
+  unicode-bidi: isolate;
+}
 button,
 a,
 input,
@@ -149,6 +157,7 @@ pre {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
+  overflow-wrap: anywhere;
   color: #c4cdd5;
   font-size: 14px;
   text-decoration: none;
@@ -727,6 +736,7 @@ pre {
 }
 .di-table-scroll {
   overflow-x: auto;
+  overscroll-behavior-inline: contain;
 }
 .di-records table {
   border-collapse: collapse;
@@ -758,6 +768,43 @@ pre {
   background: transparent;
   border: 1px solid #687786;
   padding: 8px 12px;
+}
+html[lang="he"] {
+  direction: rtl;
+  text-rendering: optimizeLegibility;
+  font-variant-numeric: proportional-nums;
+}
+html[lang="he"] :where([dir="ltr"], .di-ltr) {
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: start;
+}
+html[lang="he"] :where(.di-email, .di-url, .di-phone, .di-number) {
+  unicode-bidi: isolate;
+}
+html[lang="he"] .di-number,
+html[lang="he"] .di-phone bdi {
+  direction: ltr;
+  text-align: start;
+  white-space: nowrap;
+}
+html[lang="he"] .di-degree h3,
+html[lang="he"] .di-degree p {
+  unicode-bidi: plaintext;
+}
+html[lang="he"] .di-records td,
+html[lang="he"] .di-study-table td,
+html[lang="he"] .di-study-table th {
+  vertical-align: top;
+}
+html[lang="he"] .di-records table,
+html[lang="he"] .di-study-table {
+  font-variant-numeric: tabular-nums;
+}
+html[lang="he"] .di-nav__links a,
+html[lang="he"] .di-project-nav a,
+html[lang="he"] .di-cv-item a {
+  text-align: start;
 }
 .di-case-grid {
   display: grid;
