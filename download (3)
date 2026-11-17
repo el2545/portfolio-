@@ -1,0 +1,29 @@
+* text=auto eol=lf
+
+# Binary assets
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.xlsx binary
+*.wasm binary
+*.ttf binary
+*.pfb binary
+*.gz binary
+
+# Bundled third-party libraries should not dominate GitHub language statistics.
+leaflet.js linguist-vendored
+leaflet-heat.js linguist-vendored
+maplibre-gl*.mjs linguist-vendored
+three.module.min.js linguist-vendored
+pdf.min.mjs linguist-vendored
+pdf.worker.min.mjs linguist-vendored
+openjpeg_nowasm_fallback.js linguist-vendored
+
+# Generated simulation exports.
+*_traffic_*.json linguist-generated=true
+*_heatmap.json linguist-generated=true
+*_roads.json linguist-generated=true
+*_simulation_geo.json linguist-generated=true
+panel-crossings.json linguist-generated=true
+active-scenes.json linguist-generated=true

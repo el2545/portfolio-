@@ -1,0 +1,14 @@
+{
+  "name": "el-ghali-sany-portfolio",
+  "private": true,
+  "scripts": {
+    "validate": "node scripts/validate-repo.mjs",
+    "test": "node --test advertising-model.test.mjs panel-workshop.test.mjs replay-cache.test.mjs portfolio-integrity.test.mjs"
+  },
+  "devDependencies": {
+    "leaflet": "^1.9.4",
+    "leaflet.heat": "^0.2.0",
+    "linkedom": "0.18.12"
+  },
+  "type": "module"
+}
