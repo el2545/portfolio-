@@ -24,7 +24,6 @@ import { AdvertisingExplorer, initAdvertisingCalculator } from "./advertising.js
   let maplibregl = null;
   const menuButton = document.querySelector(".di-menu-button");
   const menu = document.querySelector(".di-nav__links");
-  const languageMenu = document.querySelector("details.di-language-switcher");
   const closeMenu = () => {
     menu?.classList.remove("is-open");
     menuButton?.setAttribute("aria-expanded", "false");
@@ -34,10 +33,6 @@ import { AdvertisingExplorer, initAdvertisingCalculator } from "./advertising.js
     }
   };
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && languageMenu?.open) {
-      languageMenu.open = false;
-      languageMenu.querySelector("summary")?.focus();
-    }
     if (event.key === "Escape" && menu?.classList.contains("is-open")) {
       closeMenu();
       menuButton?.focus();
@@ -45,15 +40,9 @@ import { AdvertisingExplorer, initAdvertisingCalculator } from "./advertising.js
   });
   document.addEventListener("click", (event) => {
     if (!event.target.closest(".di-nav")) closeMenu();
-    if (languageMenu && !languageMenu.contains(event.target)) languageMenu.open = false;
-  });
-
-  languageMenu?.addEventListener("toggle", () => {
-    if (languageMenu.open) closeMenu();
   });
 
   menuButton?.addEventListener("click", () => {
-    if (languageMenu) languageMenu.open = false;
     const isOpen = menu.classList.toggle("is-open");
     menuButton.setAttribute("aria-expanded", String(isOpen));
     menuButton.textContent = isOpen ? t("Close") : t("Menu");
@@ -69,8 +58,6 @@ import { AdvertisingExplorer, initAdvertisingCalculator } from "./advertising.js
       menu.classList.remove("is-open");
       menuButton?.setAttribute("aria-expanded", "false");
       closeMenu();
-      const target = document.querySelector(link.getAttribute("href"));
-      if (target?.hasAttribute("tabindex")) target.focus({ preventScroll: true });
     });
   });
 
@@ -1412,26 +1399,6 @@ import { AdvertisingExplorer, initAdvertisingCalculator } from "./advertising.js
   };
 
   let initializing = false;
-  const loadVectorStyles = () => new Promise((resolve) => {
-    const href = i18n.asset("maplibre-gl.css");
-    if ([...document.querySelectorAll('link[rel="stylesheet"]')].some(link => link.href === href)) {
-      resolve(true);
-      return;
-    }
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = href;
-    const finish = (loaded) => {
-      window.clearTimeout(timeout);
-      link.onload = link.onerror = null;
-      if (!loaded) link.remove();
-      resolve(loaded);
-    };
-    const timeout = window.setTimeout(() => finish(false), 8000);
-    link.onload = () => finish(true);
-    link.onerror = () => finish(false);
-    document.head.append(link);
-  });
   const initialiseMap = async () => {
     if (initializing || mapReady) return;
     initializing = true;
@@ -1439,7 +1406,7 @@ import { AdvertisingExplorer, initAdvertisingCalculator } from "./advertising.js
     const gate = document.querySelector(".di-map-gate");
     if (gate) gate.hidden = true;
     setBusy(true);setStatus(i18n.ad("loadingScene"));
-    if (supportsWebGL2 && !maplibregl && await loadVectorStyles()) {
+    if (supportsWebGL2 && !maplibregl) {
       try {
         let engineTimeout;
         try {

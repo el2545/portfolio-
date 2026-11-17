@@ -1712,12 +1712,43 @@ html[dir="rtl"] #mapNext {
 
 #adForm button[type="reset"] { color: #17202a; background: #fff; border-color: #53606c; }
 
-/* Hebrew uses its own font while sharing the established RTL geometry. */
-html[lang="he"] { --di-body: "Noto Sans Hebrew", Arial, sans-serif; --di-display: "Noto Sans Hebrew", Arial, sans-serif; }
+/* Hebrew keeps the RTL geometry but uses Hebrew-specific rhythm instead of Arabic typography defaults. */
+html[lang="he"] {
+  --di-body: "Noto Sans Hebrew", Arial, sans-serif;
+  --di-display: "Noto Sans Hebrew", Arial, sans-serif;
+}
+html[lang="he"] body {
+  line-height: 1.72;
+  font-kerning: normal;
+}
+html[lang="he"] h1,
+html[lang="he"] h2,
+html[lang="he"] h3 {
+  line-height: 1.34;
+}
 html[lang="he"] .di-mark { font-family: "Cormorant", Georgia, serif; }
+html[lang="he"] .di-nav__links a,
+html[lang="he"] .di-button,
+html[lang="he"] button,
+html[lang="he"] select { line-height: 1.4; }
+html[lang="he"] bdi[dir="ltr"],
+html[lang="he"] [lang="en"][dir="ltr"],
+html[lang="he"] [lang="fr"][dir="ltr"] { unicode-bidi: isolate; }
 .di-coursework { border-block-start: 1px solid var(--di-line); padding-block-start: 24px; margin-block-start: 28px; max-width: 95ch; }
 .di-coursework h3 { font: 500 27px/1.4 var(--di-display); }
 @media (min-width: 761px) { .di-cv-list { grid-template-columns: repeat(2,minmax(0,1fr)); } }
-html[lang="he"] #pdfPrevious,html[lang="he"] #pdfNext { direction: ltr; }
+
+/* Sequential PDF navigation mirrors in Hebrew; the page number itself remains LTR. */
+html[lang="he"] #pdfPageForm { direction: rtl; }
+html[lang="he"] #pdfPrevious,
+html[lang="he"] #pdfNext {
+  direction: ltr;
+  transform: scaleX(-1);
+}
+html[lang="he"] #pdfPage,
+html[lang="he"] #pdfTotal {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
 
 html[lang="he"] .di-hero h1 { text-align: right; }
