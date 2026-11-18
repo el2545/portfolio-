@@ -7,8 +7,15 @@ import { parseHTML } from 'linkedom';
 
 const root = new URL('./', import.meta.url);
 const read = (name) => readFile(new URL(name, root), 'utf8');
+const readBytes = (name) => readFile(new URL(name, root));
 const pages = ['index.html', 'fr.html', 'ar.html', 'he.html'];
 const locale = await read('locale.js');
+const cvHashes = {
+  en: '107d3013a2dae127fa34ff3136fee56be8a55e5ee7616a2396aa30c807f2a667',
+  fr: '7b41af3d96c3537123d13c778716ea99e9973a1dbb942df99b06c64f33d3b967',
+  ar: '985db93137e449a38ba043836c170fd5b50c3d6e6421e893e707d9a7cdedfd64',
+  he: '0e1ff4f0166da3caeeeba8fc2f9a5fd58e0f8bde162d9d89f2b89cbed24527f2'
+};
 
 test('static EN/FR/AR/HE copy, navigation, metadata and progressive enhancement', async () => {
   for (const [index, file] of pages.entries()) {
@@ -75,15 +82,28 @@ test('every academic CV is a separate, nonempty PDF with a fallback preview', as
   for (const language of ['en','fr','ar','he']) {
     const { document } = parseHTML(await read(`academic-cv-${language}.html`));
     Object.defineProperty(document, 'baseURI', { value: new URL(`academic-cv-${language}.html`, root).href });
-    const window = {};
-    vm.runInNewContext(locale, { document, window, URL, Intl });
-    for (const node of document.querySelectorAll('[data-academic]')) {
-      assert.equal(node.textContent, window.PORTFOLIO_I18N.academic(node.dataset.academic), `${language} CV: ${node.dataset.academic}`);
-    }
-    const buffer = await readFile(new URL(`academic-cv-${language}.pdf`, root));
+    assert.equal(document.documentElement.lang, language);
+    assert.equal(document.documentElement.dir, ['ar', 'he'].includes(language) ? 'rtl' : 'ltr');
+    assert.ok(!/2 pages|deux pages|صفحتان|שני עמודים/i.test(document.body.textContent));
+    const buffer = await readBytes(`academic-cv-${language}.pdf`);
     assert.equal(buffer.subarray(0, 5).toString(), '%PDF-');
-    assert.ok(buffer.length > 10000);
+    assert.equal(createHash('sha256').update(buffer).digest('hex'), cvHashes[language]);
+    assert.equal((buffer.toString('latin1').match(/\/Type\s*\/Page\b/g) || []).length, 1);
     assert.ok((await stat(new URL(`academic-cv-${language}.preview.png`, root))).size > 10000);
+  }
+});
+
+test('portfolio CV controls point to the matching language and expose all four versions', async () => {
+  for (const [index, file] of pages.entries()) {
+    const { document } = parseHTML(await read(file));
+    const language = ['en', 'fr', 'ar', 'he'][index];
+    assert.equal(document.querySelector('.di-nav-cv').getAttribute('href'), `academic-cv-${language}.pdf`, file);
+    assert.equal(document.querySelector('.di-button--ghost').getAttribute('href'), `academic-cv-${language}.pdf`, file);
+    assert.deepEqual(
+      [...document.querySelectorAll('.di-cv-item a[download]')].map(node => node.getAttribute('href')).sort(),
+      ['academic-cv-ar.pdf', 'academic-cv-en.pdf', 'academic-cv-fr.pdf', 'academic-cv-he.pdf'],
+      file
+    );
   }
 });
 
@@ -125,7 +145,7 @@ test('validated M1 and transcript-based coursework are present without private a
   for (const file of pages) {
     const { document } = parseHTML(await read(file));
     const note = document.querySelector('[data-academic="inseecNote"]').textContent;
-    assert.match(note, /60|٦٠/);
+    assert.match(note, /Master’s-level studies|Études de niveau master|دراسات على مستوى الماجستير|לימודים ברמת תואר שני/);
     assert.ok(document.querySelector('[data-academic="courseworkBody"]'));
     assert.equal(document.querySelectorAll('link[rel="alternate"][hreflang="he"]').length, 1);
     assert.equal(document.querySelectorAll('.di-cv-item').length, 4);

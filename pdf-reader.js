@@ -20,7 +20,7 @@
   }
   function fail() {
     status.textContent=t('error');el('pdfRetry').hidden=false;controls(false);canvas.hidden=true;el('pdfTextDetails').hidden=true;
-    const name=currentURL?.pathname.split('/').pop();if(!/^(?:CV_SANY_El_Ghali_(?:FR|ENG|AR)|academic-cv-(?:en|fr|ar|he))\.pdf$/.test(name||''))return;
+    const name=currentURL?.pathname.split('/').pop();if(!/^academic-cv-(?:en|fr|ar|he)\.pdf$/.test(name||''))return;
     const token=generation;
     fallbackImage.onload=()=>{if(token!==generation||!dialog.open)return;fallbackImage.hidden=false;fallbackImage.alt=t('fallback');status.textContent=t('fallback');el('pdfTotal').textContent='1';pageInput.value='1';zoom.disabled=false;};
     fallbackImage.onerror=()=>{fallbackImage.hidden=true;};
@@ -59,7 +59,7 @@
     documentPDF=null;fallbackImage.hidden=true;controls(false);canvas.hidden=true;el('pdfTextDetails').hidden=true;el('pdfRetry').hidden=true;status.textContent=t('loading');
     el('pdfTotal').textContent='—';
     try {
-      library=library||await import('./pdf.min.mjs?reader=8&attempt='+loadAttempt++);
+      library=library||await import('./pdf.min.mjs?reader=9&attempt='+loadAttempt++);
       if(token!==generation||!dialog.open)return;
       library.GlobalWorkerOptions.workerSrc=i18n.asset('pdf.worker.min.mjs');
       const url=new URL(currentURL);url.hash='';
