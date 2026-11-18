@@ -599,10 +599,6 @@
       button.setAttribute('aria-pressed', String(button.dataset.language === language));
     });
 
-    document.querySelectorAll('a[href^="CV_El_Ghali_Sany_"]').forEach((link) => {
-      link.setAttribute('href', language === 'fr' ? 'CV_El_Ghali_Sany_FR.pdf' : 'CV_El_Ghali_Sany_EN.pdf');
-    });
-
     updateMetadata();
     try {
       window.localStorage.setItem('portfolio-language', language);
