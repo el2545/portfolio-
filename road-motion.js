@@ -100,11 +100,17 @@ export function sampleTransition(transition, fraction) {
   const { from, to } = transition;
   const f = finiteClamp(fraction, 0, 1);
   if (transition.kind === 'gap') {
-    // Source-faithful policy: no reconstructed positions between observations.
-    // Only exact source/target boundaries are visible; the unresolved interval is hidden.
+    // A discontinuity is source-faithful: SUMO gives no intermediate position.
+    // Preserve only the observation that actually exists at each boundary.
+    if (transition.reason === 'vehicle-entered')
+      return f === 1
+        ? { ...to, steering: 0, gap: true, visible: true }
+        : { ...to, steering: 0, gap: true, visible: false };
+    if (transition.reason === 'vehicle-exited')
+      return f === 0
+        ? { ...from, steering: 0, gap: true, visible: true }
+        : { ...from, steering: 0, gap: true, visible: false };
     if (f === 0) return { ...from, steering: 0, gap: true, visible: true };
-    if (transition.reason === 'vehicle-exited' && f === 1)
-      return { ...from, steering: 0, gap: true, visible: false };
     if (f === 1) return { ...to, steering: 0, gap: true, visible: true };
     return { ...from, steering: 0, gap: true, visible: false };
   }
@@ -234,7 +240,18 @@ export class TrafficReplay {
     const transitionKey = `${from.time}:${to.time}:${vehicleSignature(from)}:${vehicleSignature(to)}`;
     if (!this.transitions || this.transitions.key !== transitionKey) {
       const next = new Map(to.vehicles.map(vehicle => [vehicle.id, vehicle]));
-      this.transitions = { key: transitionKey, time: from.time, rows: from.vehicles.map(vehicle => next.has(vehicle.id) ? makeTransition(vehicle, next.get(vehicle.id), this.network.lanes) : { kind: 'gap', reason: 'vehicle-exited', from: vehicle, to: vehicle }) };
+      const source = new Map(from.vehicles.map(vehicle => [vehicle.id, vehicle]));
+      const rows = [];
+      for (const vehicle of from.vehicles) {
+        rows.push(next.has(vehicle.id)
+          ? makeTransition(vehicle, next.get(vehicle.id), this.network.lanes)
+          : { kind: 'gap', reason: 'vehicle-exited', from: vehicle, to: vehicle });
+      }
+      for (const vehicle of to.vehicles) {
+        if (!source.has(vehicle.id))
+          rows.push({ kind: 'gap', reason: 'vehicle-entered', from: vehicle, to: vehicle });
+      }
+      this.transitions = { key: transitionKey, time: from.time, rows };
     }
     const result = this.transitions.rows.map(transition => {
       const vehicle = sampleTransition(transition, fraction);

@@ -95,18 +95,24 @@ assert.equal(exitReplay.between(from, to, 1).length, 0);
 const entry = { id: "entry", lane: 0, pos: 0, x: 0, y: 0, angle: 0, speed: 10 };
 assert.equal(exitReplay.between({ time: 0, vehicles: [] }, { time: 1, vehicles: [entry] }, 0).length, 0);
 assert.equal(exitReplay.between({ time: 0, vehicles: [] }, { time: 1, vehicles: [entry] }, 0.5).length, 0);
+assert.equal(exitReplay.between({ time: 0, vehicles: [] }, { time: 1, vehicles: [entry] }, 1).length, 1);
 
 const maarifManifest = JSON.parse(fs.readFileSync("maarif_traffic.json"));
 const maarifNetwork = JSON.parse(fs.readFileSync(maarifManifest.network));
 let maarifPrevious = new Map();
 let actualGap = null;
+let actualExit = null;
+let actualEntry = null;
 for (const descriptor of maarifManifest.chunks) {
   const chunk = JSON.parse(fs.readFileSync(descriptor.file));
   for (const frame of chunk.frames) {
     const current = new Map(frame[1].map(row => [row[0], row]));
     for (const [id, row] of maarifPrevious) {
       const next = current.get(id);
-      if (!next) continue;
+      if (!next) {
+        actualExit ||= { frame: frame[0], id, row };
+        continue;
+      }
       const fromVehicle = { id, lane: row[1], pos: row[2], x: row[3], y: row[4], angle: row[5], speed: row[6] };
       const toVehicle = { id, lane: next[1], pos: next[2], x: next[3], y: next[4], angle: next[5], speed: next[6] };
       const transition = makeTransition(fromVehicle, toVehicle, maarifNetwork.lanes);
@@ -115,15 +121,26 @@ for (const descriptor of maarifManifest.chunks) {
         break;
       }
     }
-    if (actualGap) break;
+    for (const [id, row] of current) {
+      if (!maarifPrevious.has(id))
+        actualEntry ||= { frame: frame[0], id, row };
+    }
+    if (actualGap && actualExit && actualEntry) break;
     maarifPrevious = current;
   }
-  if (actualGap) break;
+  if (actualGap && actualExit && actualEntry) break;
 }
 assert.ok(actualGap);
+assert.equal(actualGap.transition.from.id, 377);
+assert.equal(actualGap.transition.from.lane, 14458);
+assert.equal(actualGap.transition.to.lane, 18748);
+assert.equal(actualGap.transition.reason, "disconnected-lanes");
+assert.equal(actualGap.frame, 506);
 assert.equal(sampleTransition(actualGap.transition, 0).visible, true);
 assert.equal(sampleTransition(actualGap.transition, 0.5).visible, false);
 assert.equal(sampleTransition(actualGap.transition, 1).x, actualGap.transition.to.x);
+assert.ok(actualExit);
+assert.ok(actualEntry);
 
 assert.equal(shortestAngleDelta(359, 1), 2);
 assert.equal(shortestAngleDelta(1, 359), -2);
