@@ -52,7 +52,7 @@ export function connectedPath(lanes, source, target, budget = 90) {
 }
 export function makeTransition(from, to, lanes) {
   const source = lanes[from.lane], target = lanes[to.lane];
-  if (!source || !target) return { kind: 'gap', from, to };
+  if (!source || !target) return { kind: 'gap', reason: 'missing-lane', from, to };
   if (source.edge === target.edge && from.lane !== to.lane) return { kind: 'lane-change', from, to, source, target };
   let ids = connectedPath(lanes, from.lane, to.lane, Math.max(from.speed, to.speed) * 1.5 + 15);
   // SUMO may change a lane and cross a junction in the same recorded second.
@@ -78,10 +78,11 @@ export function makeTransition(from, to, lanes) {
       }
     }
   }
-  if (!ids || (ids.length === 1 && to.pos < from.pos - 0.1)) return { kind: 'gap', from, to };
+  if (!ids) return { kind: 'gap', reason: 'disconnected-lanes', from, to };
+  if (ids.length === 1 && to.pos < from.pos - 0.1) return { kind: 'gap', reason: 'reverse-position', from, to };
   const sections = ids.map((id, i) => ({ lane: lanes[id], start: i === 0 ? from.pos : 0, end: i === ids.length - 1 ? to.pos : lanes[id].length }));
   const distance = sections.reduce((sum, part) => sum + Math.max(0, part.end - part.start), 0);
-  if (distance > Math.max(from.speed, to.speed) * 1.5 + 20) return { kind: 'gap', from, to };
+  if (distance > Math.max(from.speed, to.speed) * 1.5 + 20) return { kind: 'gap', reason: 'excessive-distance', from, to };
   const start = lanePoint(lanes[ids[0]], from.pos), end = lanePoint(lanes[ids.at(-1)], to.pos);
   return { kind: 'lanes', from, to, sections, distance, laneChange, startOffset: [from.x - start[0], from.y - start[1]], endOffset: [to.x - end[0], to.y - end[1]] };
 }
@@ -98,9 +99,17 @@ function pathPoint(transition, distance) {
 export function sampleTransition(transition, fraction) {
   const { from, to } = transition;
   const f = finiteClamp(fraction, 0, 1);
+  if (transition.kind === 'gap') {
+    // Source-faithful policy: no reconstructed positions between observations.
+    // Only exact source/target boundaries are visible; the unresolved interval is hidden.
+    if (f === 0) return { ...from, steering: 0, gap: true, visible: true };
+    if (transition.reason === 'vehicle-exited' && f === 1)
+      return { ...from, steering: 0, gap: true, visible: false };
+    if (f === 1) return { ...to, steering: 0, gap: true, visible: true };
+    return { ...from, steering: 0, gap: true, visible: false };
+  }
   if (f === 0) return { ...from, steering: 0 };
   if (f === 1) return { ...to, steering: 0 };
-  if (transition.kind === 'gap') return { ...from, steering: 0, gap: true };
   let x, y, angle = from.angle, steering = 0;
   if (transition.kind === 'lane-change') {
     const position = from.pos + (to.pos - from.pos) * f;
@@ -219,7 +228,10 @@ export class TrafficReplay {
     return this.lastDiagnostic ? { ...this.lastDiagnostic } : null;
   }
   between(from, to, fraction) {
-    const transitionKey = `${from.time}:${to.time}`;
+    const vehicleSignature = frame => frame.vehicles.map(vehicle =>
+      `${vehicle.id}:${vehicle.lane}:${vehicle.pos}:${vehicle.x}:${vehicle.y}:${vehicle.angle}:${vehicle.speed}`
+    ).join('|');
+    const transitionKey = `${from.time}:${to.time}:${vehicleSignature(from)}:${vehicleSignature(to)}`;
     if (!this.transitions || this.transitions.key !== transitionKey) {
       const next = new Map(to.vehicles.map(vehicle => [vehicle.id, vehicle]));
       this.transitions = { key: transitionKey, time: from.time, rows: from.vehicles.map(vehicle => next.has(vehicle.id) ? makeTransition(vehicle, next.get(vehicle.id), this.network.lanes) : { kind: 'gap', reason: 'vehicle-exited', from: vehicle, to: vehicle }) };
@@ -228,7 +240,7 @@ export class TrafficReplay {
       const vehicle = sampleTransition(transition, fraction);
       const [lng, lat] = toLngLat(vehicle.x, vehicle.y, this.manifest.origin, this.manifest.scale);
       return { ...vehicle, lng, lat };
-    });
+    }).filter(vehicle => vehicle.visible !== false);
     if (this.debugVehicle) {
       const transition = this.transitions.rows.find(row => String(row.from.id) === this.debugVehicle);
       if (transition) {

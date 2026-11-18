@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import {
+  TrafficReplay,
   connectedPath,
   lanePoint,
   makeTransition,
@@ -65,7 +67,63 @@ const invalid = makeTransition(
   lanes,
 );
 assert.equal(invalid.kind, "gap");
+assert.equal(sampleTransition(invalid, 0).visible, true);
+assert.equal(sampleTransition(invalid, 0.5).visible, false);
 assert.equal(sampleTransition(invalid, 0.5).gap, true);
+assert.equal(sampleTransition(invalid, 1).visible, true);
+assert.equal(sampleTransition(invalid, 1).x, 505);
+
+const disconnectedExit = makeTransition(
+  vehicle({ lane: 0, pos: 90, x: 0, y: 90 }),
+  vehicle({ lane: 3, pos: 5, x: 505, y: 500 }),
+  lanes,
+);
+assert.equal(disconnectedExit.reason, "disconnected-lanes");
+
+const exitReplay = new TrafficReplay(
+  { type: "sumo_lane_replay", version: 1, step: 1, start: 0, end: 1, zone: "test", origin: [0, 0], scale: 1e-8, ids: ["exit"], chunks: [] },
+  { zone: "test", lanes: [{ id: "lane", length: 100, shape: [[0, 0], [0, 100]], next: [], edge: "road" }] },
+  async () => { throw new Error("not used"); },
+);
+const exiting = { id: "exit", lane: 0, pos: 10, x: 0, y: 10, angle: 0, speed: 10 };
+const from = { time: 0, vehicles: [exiting] };
+const to = { time: 1, vehicles: [] };
+assert.equal(exitReplay.between(from, to, 0).length, 1);
+assert.equal(exitReplay.between(from, to, 0.5).length, 0);
+assert.equal(exitReplay.between(from, to, 1).length, 0);
+
+const entry = { id: "entry", lane: 0, pos: 0, x: 0, y: 0, angle: 0, speed: 10 };
+assert.equal(exitReplay.between({ time: 0, vehicles: [] }, { time: 1, vehicles: [entry] }, 0).length, 0);
+assert.equal(exitReplay.between({ time: 0, vehicles: [] }, { time: 1, vehicles: [entry] }, 0.5).length, 0);
+
+const maarifManifest = JSON.parse(fs.readFileSync("maarif_traffic.json"));
+const maarifNetwork = JSON.parse(fs.readFileSync(maarifManifest.network));
+let maarifPrevious = new Map();
+let actualGap = null;
+for (const descriptor of maarifManifest.chunks) {
+  const chunk = JSON.parse(fs.readFileSync(descriptor.file));
+  for (const frame of chunk.frames) {
+    const current = new Map(frame[1].map(row => [row[0], row]));
+    for (const [id, row] of maarifPrevious) {
+      const next = current.get(id);
+      if (!next) continue;
+      const fromVehicle = { id, lane: row[1], pos: row[2], x: row[3], y: row[4], angle: row[5], speed: row[6] };
+      const toVehicle = { id, lane: next[1], pos: next[2], x: next[3], y: next[4], angle: next[5], speed: next[6] };
+      const transition = makeTransition(fromVehicle, toVehicle, maarifNetwork.lanes);
+      if (transition.kind === "gap") {
+        actualGap = { frame: frame[0], transition };
+        break;
+      }
+    }
+    if (actualGap) break;
+    maarifPrevious = current;
+  }
+  if (actualGap) break;
+}
+assert.ok(actualGap);
+assert.equal(sampleTransition(actualGap.transition, 0).visible, true);
+assert.equal(sampleTransition(actualGap.transition, 0.5).visible, false);
+assert.equal(sampleTransition(actualGap.transition, 1).x, actualGap.transition.to.x);
 
 assert.equal(shortestAngleDelta(359, 1), 2);
 assert.equal(shortestAngleDelta(1, 359), -2);
