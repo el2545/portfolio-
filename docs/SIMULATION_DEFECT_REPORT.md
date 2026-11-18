@@ -1,0 +1,44 @@
+# Traffic replay defect report
+
+## Scope and evidence
+
+The replay path is:
+
+`SUMO FCD export -> *_traffic.json manifest -> TrafficReplay.frame() -> decoded vehicle rows -> makeTransition()/sampleTransition() -> app.js requestAnimationFrame playback -> Traffic3D.update() / GeoJSON vehicle source`.
+
+The supplied MP4 was not available to the repository runtime, so no claim is made about having inspected that recording. The findings below use the checked-in SUMO replay chunks and the browser implementation.
+
+## Findings
+
+| Bug | Reproduction | Root cause | Fix | Verification | Limitations |
+| --- | --- | --- | --- | --- | --- |
+| Curved and junction movement could use a stale transition after a seek or alternate frame pair | Seek rapidly, then request interpolation for the same source second with a different target frame | `TrafficReplay.between()` keyed transitions only by `from.time` | Key transitions by both source and target timestamps | `road-motion.test.mjs`; stale-cache test | Browser timing still depends on network availability |
+| Concurrent stale frame requests could duplicate work and leave cache state dependent on response order | Request frames 0–7, then pin and request frames 8–9 with delayed responses | Frame loads had no pending-request deduplication and chunk eviction could retain in-flight entries | Deduplicate pending frame loads and evict only settled chunks; remove speculative prefetch that raced cache bounds | `replay-cache.test.mjs` | Source data may still contain legitimate discontinuities |
+| Disconnected lane changes were visually ambiguous | Inspect transitions classified as `gap` in the checked-in manifests | Some consecutive SUMO records have no connected lane path or exceed the measured one-second travel budget | Preserve the source position and mark an explicit `gap` transition; never invent a route | Full-manifest scan found 54, 10, 5, 25 and 16 gaps for Maârif, Hay Hassani, Ben M’Sick, Sidi Maârouf and Bd Mohammed V respectively | These are source-data discontinuities, not all rendering defects |
+| Heading interpolation could take the long turn across north | Interpolate angles near 0°/360° | Inline angle arithmetic was duplicated and not directly regression-tested | Centralize shortest-angle interpolation and test both wrap directions | `road-motion.test.mjs` | SUMO heading remains authoritative at valid endpoints |
+
+## Diagnostic mode
+
+Append `?trafficVehicle=<vehicle-id>` to the page URL. The selected replay exposes `window.__TRAFFIC_REPLAY__` and `getDiagnostic()` with source/target times, lanes, positions, interpolation fraction, classification, calculated transform and speed. Gap notices are logged once per vehicle/time transition rather than once per animation frame.
+
+## Validation
+
+Focused checks:
+
+```text
+node --test road-motion.test.mjs replay-cache.test.mjs
+node --check road-motion.js
+node --check app.js
+node --check traffic-3d.js
+```
+
+Repository checks:
+
+```text
+npm test
+npm run validate
+```
+
+Both completed successfully on the fix branch. A local Playwright smoke load also completed for `index.html`; the after-state screenshot was captured outside the repository runtime.
+
+The browser smoke check loaded `index.html` from a local HTTP server. The only page error was the expected blocked external Google Fonts request; the supplied MP4 was not accessible, so before/after video evidence is not asserted here.

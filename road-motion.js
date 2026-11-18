@@ -1,5 +1,7 @@
 const radians = Math.PI / 180;
 const clamp = (value, lo, hi) => Math.max(lo, Math.min(hi, value));
+const finiteClamp = (value, lo, hi) => Number.isFinite(value) ? clamp(value, lo, hi) : lo;
+export const shortestAngleDelta = (from, to) => ((to - from + 540) % 360) - 180;
 export const paintColours = ['#d9e3e6', '#487993', '#cbb78e', '#a75543', '#728c7d', '#586677'];
 export function paintIndex(id) {
   let hash = 2166136261;
@@ -95,19 +97,20 @@ function pathPoint(transition, distance) {
 }
 export function sampleTransition(transition, fraction) {
   const { from, to } = transition;
-  const f = clamp(fraction, 0, 1);
+  const f = finiteClamp(fraction, 0, 1);
   if (f === 0) return { ...from, steering: 0 };
   if (f === 1) return { ...to, steering: 0 };
   if (transition.kind === 'gap') return { ...from, steering: 0, gap: true };
   let x, y, angle = from.angle, steering = 0;
   if (transition.kind === 'lane-change') {
-    const p = lanePoint(transition.source, from.pos + (to.pos - from.pos) * f);
-    const q = lanePoint(transition.target, from.pos + (to.pos - from.pos) * f);
+    const position = from.pos + (to.pos - from.pos) * f;
+    const p = lanePoint(transition.source, position);
+    const q = lanePoint(transition.target, position);
     const blend = f * f * (3 - 2 * f);
     const a = lanePoint(transition.source, from.pos), b = lanePoint(transition.target, to.pos);
     x = p[0] + (q[0] - p[0]) * blend + (from.x - a[0]) * (1 - f) + (to.x - b[0]) * f;
     y = p[1] + (q[1] - p[1]) * blend + (from.y - a[1]) * (1 - f) + (to.y - b[1]) * f;
-    angle = (from.angle + (((to.angle - from.angle + 540) % 360) - 180) * f + 360) % 360;
+    angle = (from.angle + shortestAngleDelta(from.angle, to.angle) * f + 360) % 360;
   } else {
     // Monotone Hermite distance honours endpoint speed without overshooting the lane path.
     const d = transition.distance;
@@ -135,14 +138,28 @@ export class TrafficReplay {
   constructor(manifest, network, read) {
     if (manifest.type !== 'sumo_lane_replay' || manifest.version !== 1 || manifest.step !== 1 || network.zone !== manifest.zone) throw new Error('Invalid traffic manifest');
     this.manifest = manifest; this.network = network; this.read = read;
-    this.chunks = new Map(); this.decoded = new Map(); this.transitions = null;
+    this.chunks = new Map(); this.pendingChunks = new Set();
+    this.pendingFrames = new Map(); this.decoded = new Map(); this.transitions = null;
     this.pinned = new Set();
+    this.debugVehicle = typeof globalThis.location === 'object'
+      ? new URLSearchParams(globalThis.location.search).get('trafficVehicle')
+      : null;
+    this.lastDiagnostic = null;
+    this.lastDiagnosticNotice = null;
+    if (this.debugVehicle && typeof globalThis.window === 'object')
+      globalThis.window.__TRAFFIC_REPLAY__ = this;
     this.frames = Array.from({ length: manifest.end - manifest.start + 1 }, (_, i) => ({ time: manifest.start + i, vehicles: [] }));
   }
   pin(index) { this.pinned = new Set([index, Math.min(index + 1, this.frames.length - 1)]); }
   async frame(index) {
     index = clamp(index, 0, this.frames.length - 1);
     if (this.decoded.has(index)) return this.frames[index];
+    if (this.pendingFrames.has(index)) return this.pendingFrames.get(index);
+    const pending = this.loadFrame(index);
+    this.pendingFrames.set(index, pending);
+    try { return await pending; } finally { this.pendingFrames.delete(index); }
+  }
+  async loadFrame(index) {
     const time = this.frames[index].time;
     const chunkIndex = this.manifest.chunks.findIndex(chunk => chunk.first <= time && time <= chunk.last);
     if (chunkIndex < 0) throw new Error('Missing traffic time range');
@@ -164,30 +181,81 @@ export class TrafficReplay {
       if(old === undefined)break;
       this.frames[old] = { time: this.frames[old].time, vehicles: [] }; this.decoded.delete(old);
     }
-    if (chunkIndex + 1 < this.manifest.chunks.length && time > this.manifest.chunks[chunkIndex].last - 10) this.chunk(chunkIndex + 1).catch(() => {});
     return this.frames[index];
   }
   async chunk(index) {
     if (!this.chunks.has(index)) {
       const descriptor = this.manifest.chunks[index];
+      this.pendingChunks.add(index);
       const promise = this.read(descriptor.file).then(data => {
         if (data.zone !== this.manifest.zone || data.start !== descriptor.first || data.frames.length !== descriptor.last - descriptor.first + 1) throw new Error('Invalid traffic chunk');
         return data;
-      }).catch(error => { this.chunks.delete(index); throw error; });
+      }).catch(error => { this.chunks.delete(index); throw error; }).finally(() => {
+        this.pendingChunks.delete(index);
+        while (this.chunks.size > 3) {
+          const old = [...this.chunks.keys()].find(key => !this.pendingChunks.has(key));
+          if (old === undefined) break;
+          this.chunks.delete(old);
+        }
+      });
       this.chunks.set(index, promise);
-      while (this.chunks.size > 3) this.chunks.delete(this.chunks.keys().next().value);
+      while (this.chunks.size > 3) {
+        const old = [...this.chunks.keys()].find(key => !this.pendingChunks.has(key));
+        if (old === undefined) break;
+        this.chunks.delete(old);
+      }
     }
+    this.trimChunks();
     return this.chunks.get(index);
   }
-  between(from, to, fraction) {
-    if (!this.transitions || this.transitions.time !== from.time) {
-      const next = new Map(to.vehicles.map(vehicle => [vehicle.id, vehicle]));
-      this.transitions = { time: from.time, rows: from.vehicles.map(vehicle => next.has(vehicle.id) ? makeTransition(vehicle, next.get(vehicle.id), this.network.lanes) : { kind: 'gap', from: vehicle, to: vehicle }) };
+  trimChunks() {
+    while (this.chunks.size > 3) {
+      const old = [...this.chunks.keys()].find(key => !this.pendingChunks.has(key));
+      if (old === undefined) break;
+      this.chunks.delete(old);
     }
-    return this.transitions.rows.map(transition => {
+  }
+  getDiagnostic() {
+    return this.lastDiagnostic ? { ...this.lastDiagnostic } : null;
+  }
+  between(from, to, fraction) {
+    const transitionKey = `${from.time}:${to.time}`;
+    if (!this.transitions || this.transitions.key !== transitionKey) {
+      const next = new Map(to.vehicles.map(vehicle => [vehicle.id, vehicle]));
+      this.transitions = { key: transitionKey, time: from.time, rows: from.vehicles.map(vehicle => next.has(vehicle.id) ? makeTransition(vehicle, next.get(vehicle.id), this.network.lanes) : { kind: 'gap', reason: 'vehicle-exited', from: vehicle, to: vehicle }) };
+    }
+    const result = this.transitions.rows.map(transition => {
       const vehicle = sampleTransition(transition, fraction);
       const [lng, lat] = toLngLat(vehicle.x, vehicle.y, this.manifest.origin, this.manifest.scale);
       return { ...vehicle, lng, lat };
     });
+    if (this.debugVehicle) {
+      const transition = this.transitions.rows.find(row => String(row.from.id) === this.debugVehicle);
+      if (transition) {
+        const vehicle = sampleTransition(transition, fraction);
+        this.lastDiagnostic = {
+          vehicleId: this.debugVehicle,
+          fromTime: from.time,
+          toTime: to.time,
+          sourceLane: transition.from.lane,
+          targetLane: transition.to.lane,
+          sourcePosition: transition.from.pos,
+          targetPosition: transition.to.pos,
+          fraction: finiteClamp(fraction, 0, 1),
+          classification: transition.kind,
+          reason: transition.reason || null,
+          x: vehicle.x,
+          y: vehicle.y,
+          angle: vehicle.angle,
+          speed: vehicle.speed,
+        };
+        const noticeKey = `${from.time}:${to.time}:${transition.kind}:${transition.reason || ''}`;
+        if (typeof console !== 'undefined' && transition.kind === 'gap' && noticeKey !== this.lastDiagnosticNotice) {
+          this.lastDiagnosticNotice = noticeKey;
+          console.info('[traffic replay discontinuity]', this.lastDiagnostic);
+        }
+      }
+    }
+    return result;
   }
 }
